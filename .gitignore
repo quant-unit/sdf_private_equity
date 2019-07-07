@@ -1,0 +1,12 @@
+# .gitignore
+
+**/data_in
+**/preqin_basis_bootstrap
+**/results
+
+data_in/
+preqin_basis_bootstrap/
+results/
+
+.DS_Store
+.Rhistory
