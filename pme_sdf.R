@@ -1,5 +1,6 @@
 ##################################
 ## Private Market Equivalent - SDF
+## Elastic-Net Regularization
 ##################################
 # Prologue ------------
 if(sys.nframe() == 0L) rm(list = ls())
@@ -57,9 +58,6 @@ if(TRUE) {
     )
   }
 }
-
-
-
 
 fund.types <- names(RF_preqin.basis$original)
 
@@ -332,7 +330,7 @@ mult.run <- function(methods, fund.types, do.exps, models, preps, max.vintages, 
 }
 
 system.time(
-if(TRUE) {
+if(FALSE) {
     df.se <- mult.run(methods = "nlminb", 
                       fund.types = fund.types,
                       do.exps = c(TRUE),
@@ -344,8 +342,8 @@ if(TRUE) {
                       cv.parts = names(cv.partitions))
   saveRDS(df.se, "data_out/20190707_df.se_valwei_newcon_elasticnet_lovo.RDS")
 } else {
-  df.se <- readRDS("data_out/20190706_df.se_valwei_newcon_elasticnet_block.RDS")
-  df.se <- readRDS("data_out/20190706_df.se_valwei_newcon_elasticnet_lovo.RDS")
+  df.se <- readRDS("data_out/20190707_df.se_valwei_newcon_elasticnet_block.RDS")
+  #df.se <- readRDS("data_out/20190707_df.se_valwei_newcon_elasticnet_lovo.RDS")
 }
 )
 
@@ -380,7 +378,7 @@ min.error() [, c("fund.type", "factor", "Coef", "model", "lambda.ridge")]
 #df.se <- df.se[df.se$model %in% names(models[1:5]), ]
 
 plot.sdf.return <- function(fund.type = "BO", start.date = "1990-01-01", 
-                            max.vin = c(2010), max.hor = c(12), tag = "elasticnet_lovo",
+                            max.vin = c(2010), max.hor = c(12), tag = "elasticnet_block",
                             ymax=30, do.eps = FALSE, lambda=seq(0,0.3,0.01)) {
   
   df_pubin <- readRDS("data_in/list_pubin.RDS")$df[, 1:7]
@@ -402,7 +400,7 @@ plot.sdf.return <- function(fund.type = "BO", start.date = "1990-01-01",
   df.ss <- df.ss[df.ss$cv.part == "cv0" & df.ss$lambda.ridge %in% lambda, ]
   
   average.alpha <- mean(df.ss$Coef[df.ss$factor == "One"]) # average alpha
-  
+  best.alpha <- df.ss$Coef[df.ss$factor == "One" & df.ss$model.id == best.cv.model.id]
 
   
   for(model.id in levels(df.ss$model.id)) {
@@ -453,9 +451,9 @@ plot.sdf.return <- function(fund.type = "BO", start.date = "1990-01-01",
   lines(df_pubin$Date, exp(cumsum( df_pubin[, best.cv.model.id] )), col="red", lwd=2)
   
   legend("topleft", bty = "n", 
-         legend = c("Average SDF", "Fama-French Mkt", paste("Max. Vintage:", paste(max.vin, collapse = ", ")), 
+         legend = c("Selected SDF", "Fama-French Mkt", paste("Max. Vintage:", paste(max.vin, collapse = ", ")), 
                     paste("Max. Horizon:", paste(max.hor, collapse = ", ")),
-                    paste("Monthly alpha: ", eval(round(average.alpha*100,3)), "%", sep=""),
+                    paste("Monthly alpha: ", eval(round(best.alpha*100,3)), "%", sep=""),
                     paste("Ridge-Lasso Coef:", best.lambda,sep = "")),
          lwd=c(2,2,NA,NA,NA,NA), lty=c(1,1,NA,NA,NA,NA), col=c("red", "black", NA,NA,NA,NA))
   
