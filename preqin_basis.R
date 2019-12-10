@@ -53,9 +53,22 @@ preqin_basis$prep.ff <- function() {
 
 # Get public data ----------
 preqin_basis$get.factor.predictor.data <- function(fred.vec) {
-  df.xl <- readxl::read_excel(path = "data_in/Public_Indices_Prepared.xlsx", sheet = "gross_returns")
+  df.xl <- readxl::read_excel(path = "data_in/Public_Indices_Prepared.xlsx", sheet = "gross_returns_filled")
   df.xl <- data.frame(df.xl)
   df.xl$Date <- as.Date(df.xl$Date)
+  
+  # asset metrix indices are historically filled too muc
+  if(FALSE) {
+    col.bond <- "S.P.Global.Developed.Sovereign.Bond.Index.Total.Return"
+    am.factors <- c()
+    for(col in colnames(df.xl)[-1]) {
+      if(col != col.bond) {
+        df.xl[, col] <- df.xl[, col] - df.xl[, col.bond]
+        am.factors <- c(am.factors, col)
+      }
+    }
+    factor.set <- am.factors
+  }
 
   # merge with fama french data
   df.ff <- preqin_basis$prep.ff()
@@ -63,10 +76,10 @@ preqin_basis$get.factor.predictor.data <- function(fred.vec) {
   df_pubin <- df.ff
   
   factor.set <- c("Mkt.RF", "SMB", "HML", "RMW", "CMA")
-  factor.set <- colnames(df.ff)[!(colnames(df.ff) %in% c("Date", "SMB", "HML", "RMW", "CMA"))]
+  #factor.set <- colnames(df.ff)[!(colnames(df.ff) %in% c("Date", "SMB", "HML", "RMW", "CMA"))]
   
-  df_pubin <- df_pubin[complete.cases(df_pubin), ]
   df_pubin <- df_pubin[df_pubin$Date > as.Date("1979-12-31"), ]
+  df_pubin <- df_pubin[complete.cases(df_pubin), ]
   
   # fred.. data 
   dl.fred <- function(new.var) {
@@ -95,17 +108,27 @@ preqin_basis$read.list_pubin <- function() {
   return(readRDS("data_in/list_pubin.RDS"))
 }
 
+if(FALSE) {
+  preqin_basis$get.factor.predictor.data(c('TB3MS', 'T10Y3M', 'TEDRATE','USSLIND', 'VXOCLS', 'CFNAIDIFF', 'BAA10Y'))
+  list_pubin <- preqin_basis$read.list_pubin()
+  df_pubin <- list_pubin$df_pubin
+}
+
 
 # Create preqin.basis ------
-preqin_basis$value.weight.cfs <- function(df) {
-  # Fill Fund Size USD by Vintage Median
-  df.median.size <- aggregate(list(Median.size.USD = df$Fund.Size..mn.USD.), by = list(Vintage = df$Vintage), function(x) median(x, na.rm = TRUE))
-  df.median.size$Median.size.USD[is.na(df.median.size$Median.size.USD)] <- min(df.median.size$Median.size.USD, na.rm = TRUE)
-  df <- merge(df, df.median.size, by="Vintage", all.x = TRUE)
-  df$Fund.Size..mn.USD. <- ifelse(is.na(df$Fund.Size..mn.USD.), df$Median.size.USD, df$Fund.Size..mn.USD.)
-  for(col in c("Transaction.Amount", "Cumulative.Contribution", "Cumulative.Distribution", "Net.Cash.Flow")) {
-    df[, col] <- df[, col] * df$Fund.Size..mn.USD. / 10 # in USD
+preqin_basis$value.weight.cfs <- function(df, do.value.weighting) {
+  # Fill Fund Size USD by Vintage mean
+  df.mean.size <- aggregate(list(mean.size.USD = df$Fund.Size..mn.USD.), by = list(Vintage = df$Vintage), function(x) mean(x, na.rm = TRUE))
+  df.mean.size$mean.size.USD[is.na(df.mean.size$mean.size.USD)] <- min(df.mean.size$mean.size.USD, na.rm = TRUE)
+  df <- merge(df, df.mean.size, by="Vintage", all.x = TRUE)
+  df$Fund.Size..mn.USD. <- ifelse(is.na(df$Fund.Size..mn.USD.), df$mean.size.USD, df$Fund.Size..mn.USD.)
+  
+  if(do.value.weighting) {
+    for(col in c("Transaction.Amount", "Cumulative.Contribution", "Cumulative.Distribution", "Net.Cash.Flow")) {
+      df[, col] <- df[, col] * df$Fund.Size..mn.USD. / df$mean.size.USD
+    }
   }
+
   return(df)
 }
 
@@ -116,9 +139,31 @@ preqin_basis$create.preqin.basis <- function(do.boostrap, do.value.weighting,
   Fund.Types <- list(
     VC = c("Balanced", "Early Stage", "Early Stage: Seed", "Early Stage: Start-up", 
            "Expansion / Late Stage", "Venture (General)", "Venture Debt"),
+    VC_Balanced = c("Balanced", "Venture (General)"),
+    VC_Early = c("Early Stage", "Early Stage: Seed", "Early Stage: Start-up"),
+    VC_Late = "Expansion / Late Stage",
+    VC_Debt = "Venture Debt",
     BO = c("Buyout", "Growth"),
+    BO_Buyout = "Buyout",
+    BO_Growth = "Growth",
     Debt = c("Direct Lending", "Distressed Debt", "Mezzanine", "Special Situations", "Turnaround"),
-    Real = c("Infrastructure", "Natural Resources", "Real Asset", "Real Estate", "Timber")
+    Debt_Direct = "Direct Lending",
+    Debt_DD = "Distressed Debt",
+    Debt_MEZZ = "Mezzanine",
+    Debt_SS = "Special Situations",
+    Debt_TA = "Turnaround",
+    Debt_SSTA = c("Special Situations", "Turnaround"),
+    Debt_Other = c("Special Situations", "Turnaround", "Direct Lending", "Venture Debt"),
+    Real = c("Infrastructure", "Natural Resources", "Real Asset", "Real Estate", "Timber"),
+    Real_INF = "Infrastructure",
+    Real_NATRES = "Natural Resources",
+    Real_Assets = c("Real Asset", "Real Asset Fund of Funds"),
+    Real_Estate = c("Real Estate", "Real Estate Fund of Funds", "Real Estate Co-Investment", "Real Estate Secondaries"),
+    Real_Timber = "Timber",
+    Real_NR_TIM = c("Natural Resources", "Timber"),
+    FOF = "Fund of Funds",
+    SEC = c("Secondaries", "Direct Secondaries"),
+    FOFSEC = c("Fund of Funds", "Secondaries", "Direct Secondaries")
   )
   
   # load preqin data
@@ -127,10 +172,9 @@ preqin_basis$create.preqin.basis <- function(do.boostrap, do.value.weighting,
   df.p <- data.frame(df.p)
   df.p$Transaction.Date <- as.Date(df.p$Transaction.Date)
   df.p$Category.Type <- as.factor(df.p$Category.Type)
-  
-  if(do.value.weighting) {
-    df.p <- preqin_basis$value.weight.cfs(df.p)
-  }
+  #print(table(df.p$Category.Type))
+
+  df.p <- preqin_basis$value.weight.cfs(df.p, do.value.weighting)
   
   # utils function
   lag.it <- function(x) {
@@ -153,6 +197,8 @@ preqin_basis$create.preqin.basis <- function(do.boostrap, do.value.weighting,
       no.funds <- length(unique(df.type$Fund.ID))
       print(paste("# funds:", no.funds))
       if(no.funds == 0) next
+      
+      sum.fund.sizes <- sum(aggregate(Fund.Size..mn.USD. ~ Fund.ID, df.type, mean))
       
       # bootstrap
       if(do.boostrap) {
@@ -241,6 +287,8 @@ preqin_basis$create.preqin.basis <- function(do.boostrap, do.value.weighting,
       out.list[["df"]][[paste(vintage)]] <- df.type
       out.list[["factor.set"]] <- factor.set
       out.list[["predictor.set"]] <- predictor.set
+      out.list[["no.funds"]][[paste(vintage)]] <- no.funds
+      out.list[["mean.fund.sizes"]][[paste(vintage)]] <- sum.fund.sizes / no.funds
     }
     type.list[[fund.type]] <- out.list
   }
@@ -252,7 +300,7 @@ preqin_basis$create.preqin.basis <- function(do.boostrap, do.value.weighting,
 # Save preqin.basis ------------ 
 preqin_basis$save.preqin.basis <- function(numeraire, fred.vec) {
   preqin.basis <- list()
-  do.value.weighting <- TRUE
+  do.value.weighting <- FALSE
   preqin.basis[["original"]] <- preqin_basis$create.preqin.basis(do.boostrap = FALSE, 
                                                                  do.value.weighting = do.value.weighting,
                                       numeraire = numeraire,
@@ -268,7 +316,7 @@ preqin_basis$save.preqin.basis <- function(numeraire, fred.vec) {
 preqin_basis$save.preqin.basis.boostrap <- function(numeraire, fred.vec, iter) {
   preqin.basis <- list()
   for(i in 1:iter) {
-    preqin.basis[[paste("b",i,sep="")]] <-preqin_basis$create.preqin.basis(do.boostrap = TRUE, 
+    preqin.basis[[paste("b",i,sep="")]] <- preqin_basis$create.preqin.basis(do.boostrap = TRUE, 
                                                     numeraire = numeraire,
                                                     fred.vec = fred.vec,
                                                     list_pubin = preqin_basis$read.list_pubin())
@@ -283,7 +331,7 @@ preqin_basis$save.preqin.basis.boostrap <- function(numeraire, fred.vec, iter) {
 # Epilogue ----------
 
 preqin_basis$main <- function(seed) {
-  fred.vec = c('TB3MS', 'T10Y3M', 'TEDRATE','USSLIND', 'VXOCLS', 'CFNAIDIFF', 'BAA10Y')
+  fred.vec <- c('TB3MS', 'T10Y3M', 'TEDRATE','USSLIND', 'VXOCLS', 'CFNAIDIFF', 'BAA10Y')
   # preqin_basis$get.factor.predictor.data(fred.vec)
   preqin_basis$save.preqin.basis(numeraire = "RF", fred.vec = fred.vec)
   set.seed(seed)
