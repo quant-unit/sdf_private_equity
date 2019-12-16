@@ -160,7 +160,7 @@ plot.cum.net.cash.flow()
 
 
 # GMM loss function ------
-expontential.affine <- FALSE
+expontential.affine <- TRUE
 driessen <- FALSE # similar to GMM when sub-fund-type conditions are used
 fund.types <- ftl[["PE"]]
 by <- 1
@@ -396,9 +396,9 @@ one.step.iter <- function(fund.type.list, max.vintages) {
 
 
 if(expontential.affine) {
-  file.path <- paste0("data_out/resi_exp_ff_", paste(weighting, collapse = "_"), ".RDS")
+  file.path <- paste0("resi/resi_exp_ff_", paste(weighting, collapse = "_"), ".RDS")
 } else {
-  file.path <- paste0("data_out/resi_lin_ff_", paste(weighting, collapse = "_"), ".RDS")
+  file.path <- paste0("resi/resi_lin_ff_", paste(weighting, collapse = "_"), ".RDS")
 }
 
 if(TRUE) {
@@ -415,7 +415,12 @@ df.resi <- do.call(dplyr::bind_rows, unlist(resi, recursive = FALSE))
 ff <- c("One", "Mkt.RF", "SMB", "HML", "RMW", "CMA")
 df.resi[, ff][is.na(df.resi[, ff])] <- 0
 
-#write.csv(df.resi, paste0("data_out/df_resi_", paste(weighting, collapse = "_"),".csv"))
+if(expontential.affine) {
+  write.csv(df.resi, paste0("resi/df_resi_exp_", paste(weighting, collapse = "_"),".csv"))
+} else {
+  write.csv(df.resi, paste0("resi/df_resi_lin_", paste(weighting, collapse = "_"),".csv"))
+}
+
 
 # squared pricing error analysis -----
 

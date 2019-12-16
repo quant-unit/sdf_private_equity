@@ -3,6 +3,9 @@
 **/data_in
 **/preqin_basis_bootstrap
 **/results
+**/boost
+**/data_out_old
+**/EPS1
 
 data_in/
 preqin_basis_bootstrap/
