@@ -5,7 +5,9 @@
 **/results
 **/boost
 **/data_out_old
+**/data_out
 **/EPS1
+**/outdated
 
 data_in/
 preqin_basis_bootstrap/
